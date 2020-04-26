@@ -1,0 +1,85 @@
+---
+title: "Reproducible Research for Data Science Course Project"
+author: "kktof1"
+date: '2020 4 21 '
+output: html_document
+---
+
+* **Synopsis : This document is for Data Science Course Project of Reproducible Research.**  
+**This document will take care of U.S. National Oceanic and Atomospheric Administration's storm database and its analysis.**
+**And this will figure out (1) what type of storm is most harmful to people, and (2) what type is giving greatest influence to property**
+  
+```{r setup, include=FALSE}
+# Environment setting
+knitr::opts_chunk$set(echo = TRUE)
+
+# Libraries
+library(dplyr)
+library(stringr)
+```
+
+## Reading data
+We will download the data and read its bz2 file.  
+  
+```{R, cache = TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "repdata_data_StormData.csv.bz2")
+orgData<-read.csv("repdata_data_StormData.csv.bz2", header = TRUE, stringsAsFactors = FALSE, sep = ",", quote = "\"")
+```
+
+## Data Processing
+### Removing data error from original data
+```{R, cache = TRUE}
+  # Preparing processed data
+prcData <- orgData
+  # To remove reading error, check the value of fist column("STATE").
+  # If the value is not proper remove the row
+prcData <- subset(orgData, str_length(orgData$STATE__) <= 5)
+prcData <- subset(prcData, str_length(prcData$STATE) == 2)
+prcData <- subset(prcData, !is.na(prcData$STATE__))
+```
+
+### Transforming some columns of processed data to proper data type
+```{R}
+  # To caculate mean of injuries
+injuriesNum <- as.numeric(prcData$INJURIES)
+  # To caculate mean of property damages
+propdmgNum <- as.numeric(prcData$PROPDMG)
+
+  # To calculate proper exponential of property damage
+propdmgexpNum <- vector(length = nrow(prcData))
+propdmgexpNum[] <- 1
+propdmgexpNum[which((prcData$PROPDMGEXP == "K") | (prcData$PROPDMGEXP == "k"))] <- 1000
+propdmgexpNum[which((prcData$PROPDMGEXP == "M") | (prcData$PROPDMGEXP == "m"))] <- 1000000
+propdmgexpNum[which((prcData$PROPDMGEXP == "B") | (prcData$PROPDMGEXP == "b"))] <- 1000000000
+propdmgCalc <- propdmgNum * propdmgexpNum
+
+  # Mutate the injuriesNum and propdmgCalc to the prcData
+prcData <- mutate(prcData, injuriesNum, propdmgCalc)
+```
+
+## Results
+```{R}
+  # Calculate mean of injuries with grouping by EVTYPE
+groupInjury <- tapply(prcData$injuriesNum, prcData$EVTYPE, mean, na.rm = TRUE)
+  # Plot to see the distribution of the data
+groupInjurySort <- sort(groupInjury[!is.na(groupInjury)], decreasing = TRUE)
+groupInjury10 <- groupInjurySort[1:10]
+barplot(groupInjury10, main = "This is barplot for Top 10 injuries")
+
+  # Find the element name which has biggest mean value of injuries 
+names(groupInjury[which(groupInjury == max(groupInjury, na.rm = TRUE))])
+
+  # Calculate mean of property damage with grouping by EVTYPE
+groupProperty <- tapply(prcData$propdmgCalc, prcData$EVTYPE, mean, na.rm = TRUE)
+  # Plot to see the distribution of the data
+groupPropertySort <- sort(groupProperty[!is.na(groupProperty)], decreasing = TRUE)
+groupProperty10 <- groupPropertySort[1:10]
+barplot(groupProperty10, main = "This is barplot for Top 10 property damages")
+  # Find the element name which has biggest mean value of injuries 
+names(groupProperty[which(groupProperty == max(groupProperty, na.rm = TRUE))])
+```
+* **Conclusion : As we can see from above result,**
+**1. The most harmful type is "Heat Wave"**  
+**2. The type of greatest economic consequences is "Tornadoes, TSTM Wind, Hair"**  
+
+
